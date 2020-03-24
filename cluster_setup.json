@@ -17,7 +17,7 @@
     "bid": 50
   },
   "fixed_params": {
-    "input_dir": "/home/ExperimentData"
+    "input_dir": "/home/mrolinek/ExperimentData"
   },
   "restarts": 1,
   "samples": null,
