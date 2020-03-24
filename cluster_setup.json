@@ -14,7 +14,7 @@
     "request_gpus": 0,
     "cuda_requirement": null,
     "memory_in_mb": 16000,
-    "bid": 50,
+    "bid": 50
   },
   "fixed_params": {
     "input_dir": "/home/ExperimentData"
@@ -24,7 +24,7 @@
   "hyperparam_list": [
     {
       "param": "folder_number",
-      "values": "{range(1, 10)}"
+      "values": "{list(range(1, 10))}"
     }
   ]
 }
