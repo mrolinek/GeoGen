@@ -1,0 +1,30 @@
+{
+  "optimization_procedure_name": "test",
+  "results_dir": "/home/mrolinek/GeoGenResults",
+  "git_params": {
+    "branch": "experiment",
+    "commit": null
+  },
+  "script_relative_path": "main.py",
+  "remove_jobs_dir": false,
+  "environment_setup": {
+  },
+  "cluster_requirements": {
+    "request_cpus": 1,
+    "request_gpus": 0,
+    "cuda_requirement": null,
+    "memory_in_mb": 16000,
+    "bid": 50,
+  },
+  "fixed_params": {
+    "input_dir": "/home/ExperimentData"
+  },
+  "restarts": 1,
+  "samples": null,
+  "hyperparam_list": [
+    {
+      "param": "folder_number",
+      "values": "{range(1, 10)}"
+    }
+  ]
+}
