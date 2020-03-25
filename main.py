@@ -13,7 +13,7 @@ os.makedirs(params.model_dir, exist_ok=True)
 input_path = os.path.join(params.input_dir, f'input_{params.folder_number}')
 orig_settings["ProblemGeneratorInputProviderSettings"]["InputFolderPath"] = input_path
 orig_settings["ProblemGenerationRunnerSettings"]["JsonBestTheoremFolder"] = params.model_dir
-orig_settings["LoggingSettings"]["Loggers"][1]["FileLogPath"] = params.model_dir
+#orig_settings["LoggingSettings"]["Loggers"][1]["FileLogPath"] = params.model_dir
 
 st = os.stat('GeoGen.MainLauncher')
 os.chmod('GeoGen.MainLauncher', st.st_mode | stat.S_IEXEC)
