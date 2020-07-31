@@ -1,6 +1,4 @@
-﻿using GeoGen.ProblemAnalyzer;
-using GeoGen.TheoremSorter;
-using System;
+﻿using System;
 
 namespace GeoGen.MainLauncher
 {
@@ -54,29 +52,30 @@ namespace GeoGen.MainLauncher
 
         /// <summary>
         /// The extensions of all types of output files except for JSON files, i.e. files described in
-        /// <see cref="ReadableOutputWithoutProofsFolder"/> and <see cref="ReadableOutputWithProofsFolder"/>.
+        /// <see cref="ReadableOutputWithoutProofsFolder"/>, <see cref="ReadableOutputWithProofsFolder"/>
+        /// and <see cref="ReadableBestTheoremFolder"/>.
         /// </summary>
         public string FileExtension { get; }
 
         /// <summary>
-        /// The path to the human-readable file where the best theorems should be written to.
+        /// The folder with human-readable best theorem files where the best theorems of individual types should be written.
         /// </summary>
-        public string ReadableBestTheoremFilePath { get; }
+        public string ReadableBestTheoremFolder { get; }
 
         /// <summary>
-        /// Indicates whether we should write the human-readable file with the best theorems.
+        /// Indicates whether we should write human-readable best theorem files to <see cref="ReadableBestTheoremFolder"/>.
         /// </summary>
-        public bool WriteReadableBestTheoremFile { get; }
+        public bool WriteReadableBestTheorems { get; }
 
         /// <summary>
-        /// The path to the JSON file where the best theorems should be written to.
+        /// The folder with JOSN best theorem files where the best theorems of individual types should be written.
         /// </summary>
-        public string JsonBestTheoremFilePath { get; }
+        public string JsonBestTheoremFolder { get; }
 
         /// <summary>
         /// Indicates whether we should write the JSON file with the best theorems.
         /// </summary>
-        public bool WriteJsonBestTheoremFile { get; }
+        public bool WriteJsonBestTheorems { get; }
 
         /// <summary>
         /// Indicates whether we should write the best theorem files every time we have a new best theorem.
@@ -105,18 +104,6 @@ namespace GeoGen.MainLauncher
         /// </summary>
         public bool LogProgress { get; }
 
-        /// <summary>
-        /// Indicates whether <see cref="IGeneratedProblemAnalyzer"/> should be called only for the
-        /// configurations of the last iteration. Otherwise it is called for every generated configuration.
-        /// </summary>
-        public bool AnalyzeOnlyLastIteration { get; }
-
-        /// <summary>
-        /// Indicates whether <see cref="ITheoremSorter"/> should track at most one interesting theorem per
-        /// configuration, the one with the highest ranking. Otherwise it tracks all of them.
-        /// </summary>
-        public bool TakeAtMostOneInterestingTheoremPerConfiguration { get; }
-
         #endregion
 
         #region Constructor
@@ -124,25 +111,23 @@ namespace GeoGen.MainLauncher
         /// <summary>
         /// Initializes a new instance of the<see cref="ProblemGenerationRunnerSettings"/> class.
         /// </summary>
-        /// <param name="readableOutputWithoutProofsFolder"><see cref="ReadableOutputWithoutProofsFolder"/></param>
-        /// <param name="writeReadableOutputWithoutProofs"><see cref="WriteReadableOutputWithoutProofs"/></param>
-        /// <param name="readableOutputWithProofsFolder"><see cref="ReadableOutputWithProofsFolder"/></param>
-        /// <param name="writeReadableOutputWithProofs"><see cref="WriteReadableOutputWithProofs"/></param>
-        /// <param name="jsonOutputFolder"><see cref="JsonOutputFolder"/></param>
-        /// <param name="writeJsonOutput"><see cref="WriteJsonOutput"/></param>
-        /// <param name="outputFilePrefix"><see cref="OutputFilePrefix"/></param>
-        /// <param name="fileExtension"><see cref="FileExtension"/></param>
-        /// <param name="readableBestTheoremFilePath"><see cref="ReadableBestTheoremFilePath"/></param>
-        /// <param name="writeReadableBestTheoremFile"><see cref="WriteReadableBestTheoremFile"/></param>
-        /// <param name="jsonBestTheoremFilePath"><see cref="JsonBestTheoremFilePath"/></param>
-        /// <param name="writeJsonBestTheoremFile"><see cref="WriteJsonBestTheoremFile"/></param>
-        /// <param name="writeBestTheoremsContinuously"><see cref="WriteBestTheoremsContinuously"/></param>
-        /// <param name="inferenceRuleUsageFilePath"><see cref="InferenceRuleUsageFilePath"/></param>
-        /// <param name="writeInferenceRuleUsages"><see cref="WriteInferenceRuleUsages"/></param>
-        /// <param name="progressLoggingFrequency"><see cref="ProgressLoggingFrequency"/></param>
-        /// <param name="logProgress"><see cref="LogProgress"/></param>
-        /// <param name="analyzeOnlyLastIteration"><see cref="AnalyzeOnlyLastIteration"/></param>
-        /// <param name="takeAtMostOneInterestingTheoremPerConfiguration"><see cref="TakeAtMostOneInterestingTheoremPerConfiguration"/></param>
+        /// <param name="readableOutputWithoutProofsFolder"><inheritdoc cref="ReadableOutputWithoutProofsFolder" path="/summary"/></param>
+        /// <param name="writeReadableOutputWithoutProofs"><inheritdoc cref="WriteReadableOutputWithoutProofs" path="/summary"/></param>
+        /// <param name="readableOutputWithProofsFolder"><inheritdoc cref="ReadableOutputWithProofsFolder" path="/summary"/></param>
+        /// <param name="writeReadableOutputWithProofs"><inheritdoc cref="WriteReadableOutputWithProofs" path="/summary"/></param>
+        /// <param name="jsonOutputFolder"><inheritdoc cref="JsonOutputFolder" path="/summary"/></param>
+        /// <param name="writeJsonOutput"><inheritdoc cref="WriteJsonOutput" path="/summary"/></param>
+        /// <param name="outputFilePrefix"><inheritdoc cref="OutputFilePrefix" path="/summary"/></param>
+        /// <param name="fileExtension"><inheritdoc cref="FileExtension" path="/summary"/></param>
+        /// <param name="readableBestTheoremFolder"><inheritdoc cref="ReadableBestTheoremFolder" path="/summary"/></param>
+        /// <param name="writeReadableBestTheorems"><inheritdoc cref="WriteReadableBestTheorems" path="/summary"/></param>
+        /// <param name="jsonBestTheoremFolder"><inheritdoc cref="JsonBestTheoremFolder" path="/summary"/></param>
+        /// <param name="writeJsonBestTheorems"><inheritdoc cref="WriteJsonBestTheorems" path="/summary"/></param>
+        /// <param name="writeBestTheoremsContinuously"><inheritdoc cref="WriteBestTheoremsContinuously" path="/summary"/></param>
+        /// <param name="inferenceRuleUsageFilePath"><inheritdoc cref="InferenceRuleUsageFilePath" path="/summary"/></param>
+        /// <param name="writeInferenceRuleUsages"><inheritdoc cref="WriteInferenceRuleUsages" path="/summary"/></param>
+        /// <param name="progressLoggingFrequency"><inheritdoc cref="ProgressLoggingFrequency" path="/summary"/></param>
+        /// <param name="logProgress"><inheritdoc cref="LogProgress"/></param>
         public ProblemGenerationRunnerSettings(string readableOutputWithoutProofsFolder,
                                                bool writeReadableOutputWithoutProofs,
                                                string readableOutputWithProofsFolder,
@@ -151,17 +136,15 @@ namespace GeoGen.MainLauncher
                                                bool writeJsonOutput,
                                                string outputFilePrefix,
                                                string fileExtension,
-                                               string readableBestTheoremFilePath,
+                                               string readableBestTheoremFolder,
+                                               bool writeReadableBestTheorems,
+                                               string jsonBestTheoremFolder,
+                                               bool writeJsonBestTheorems,
                                                bool writeBestTheoremsContinuously,
-                                               bool writeReadableBestTheoremFile,
-                                               string jsonBestTheoremFilePath,
-                                               bool writeJsonBestTheoremFile,
                                                string inferenceRuleUsageFilePath,
                                                bool writeInferenceRuleUsages,
                                                int progressLoggingFrequency,
-                                               bool logProgress,
-                                               bool analyzeOnlyLastIteration,
-                                               bool takeAtMostOneInterestingTheoremPerConfiguration)
+                                               bool logProgress)
         {
             ReadableOutputWithoutProofsFolder = readableOutputWithoutProofsFolder;
             WriteReadableOutputWithoutProofs = writeReadableOutputWithoutProofs;
@@ -171,17 +154,15 @@ namespace GeoGen.MainLauncher
             WriteJsonOutput = writeJsonOutput;
             OutputFilePrefix = outputFilePrefix;
             FileExtension = fileExtension;
-            ReadableBestTheoremFilePath = readableBestTheoremFilePath;
-            WriteReadableBestTheoremFile = writeReadableBestTheoremFile;
-            JsonBestTheoremFilePath = jsonBestTheoremFilePath;
-            WriteJsonBestTheoremFile = writeJsonBestTheoremFile;
+            ReadableBestTheoremFolder = readableBestTheoremFolder;
+            WriteReadableBestTheorems = writeReadableBestTheorems;
+            JsonBestTheoremFolder = jsonBestTheoremFolder;
+            WriteJsonBestTheorems = writeJsonBestTheorems;
             WriteBestTheoremsContinuously = writeBestTheoremsContinuously;
             InferenceRuleUsageFilePath = inferenceRuleUsageFilePath;
             WriteInferenceRuleUsages = writeInferenceRuleUsages;
             ProgressLoggingFrequency = progressLoggingFrequency;
             LogProgress = logProgress;
-            AnalyzeOnlyLastIteration = analyzeOnlyLastIteration;
-            TakeAtMostOneInterestingTheoremPerConfiguration = takeAtMostOneInterestingTheoremPerConfiguration;
 
             // Ensure that the output folder without proofs is set if we are supposed to use it
             if (writeReadableOutputWithoutProofs && readableOutputWithoutProofsFolder == null)
@@ -195,13 +176,13 @@ namespace GeoGen.MainLauncher
             if (writeJsonOutput && jsonOutputFolder == null)
                 throw new MainLauncherException("The JSON output folder must be set as we are going to use it.");
 
-            // Ensure that the readable best theorem file path is set if we are supposed to use it
-            if (writeReadableBestTheoremFile && readableBestTheoremFilePath == null)
-                throw new MainLauncherException("The readable best theorem file path must be set as we are going to use it.");
+            // Ensure that the readable best theorem folder is set if we are supposed to use it
+            if (writeReadableBestTheorems && readableBestTheoremFolder == null)
+                throw new MainLauncherException("The readable best theorem folder must be set as we are going to use it.");
 
-            // Ensure that the JSON best theorem file path is set if we are supposed to use it
-            if (writeJsonBestTheoremFile && jsonBestTheoremFilePath == null)
-                throw new MainLauncherException("The JSON best theorem file path must be set as we are going to use it.");
+            // Ensure that the JSON best theorem folder is set if we are supposed to use it
+            if (writeJsonBestTheorems && jsonBestTheoremFolder == null)
+                throw new MainLauncherException("The JSON best theorem folder must be set as we are going to use it.");
 
             // Ensure that the inference rule usage file path is set if we are supposed to use it
             if (writeInferenceRuleUsages && inferenceRuleUsageFilePath == null)

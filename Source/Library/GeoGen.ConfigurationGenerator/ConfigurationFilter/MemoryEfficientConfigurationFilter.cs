@@ -6,7 +6,7 @@ using System.Linq;
 namespace GeoGen.ConfigurationGenerator
 {
     /// <summary>
-    /// Represents a <see cref="IConfigurationFilter"/> that used O(1) memory. The exclusion is done via 
+    /// Represents a <see cref="IConfigurationFilter"/> that uses O(1) memory. The exclusion is done via 
     /// a non-trivial algorithm that assigns to every set of equal configurations that could be generated
     /// the unique representant that was the representant of such a set in the previous iteration.
     /// </summary>
@@ -17,12 +17,12 @@ namespace GeoGen.ConfigurationGenerator
         /// <summary>
         /// The assigned ids of the loose objects of the initial and therefore any subsequent configuration.
         /// </summary>
-        private readonly Dictionary<LooseConfigurationObject, int> _looseObjectsId = new Dictionary<LooseConfigurationObject, int>();
+        private readonly Dictionary<LooseConfigurationObject, char> _looseObjectsId = new Dictionary<LooseConfigurationObject, char>();
 
         /// <summary>
         /// The assigned ids of constructions that might appear in object's definitions.
         /// </summary>
-        private readonly Dictionary<Construction, int> _constructionsId = new Dictionary<Construction, int>();
+        private readonly Dictionary<Construction, char> _constructionsId = new Dictionary<Construction, char>();
 
         /// <summary>
         /// The initial objects of every configuration.
@@ -43,7 +43,7 @@ namespace GeoGen.ConfigurationGenerator
             _initialObjects = generatorInput.InitialConfiguration.ConstructedObjects;
 
             // Assign ids to loose objects
-            generatorInput.InitialConfiguration.LooseObjects.ForEach((looseObject, index) => _looseObjectsId.Add(looseObject, index));
+            generatorInput.InitialConfiguration.LooseObjects.ForEach((looseObject, index) => _looseObjectsId.Add(looseObject, (char)index));
 
             // Assign ids to constructions used in the generation
             generatorInput.Constructions
@@ -52,7 +52,7 @@ namespace GeoGen.ConfigurationGenerator
                 // We need distinct ones so that we don't identify the same one twice
                 .Distinct()
                 // Add the id to the dictionary
-                .ForEach((construction, index) => _constructionsId.Add(construction, index));
+                .ForEach((construction, index) => _constructionsId.Add(construction, (char)index));
         }
 
         #endregion
@@ -70,8 +70,8 @@ namespace GeoGen.ConfigurationGenerator
             // Prepare the cache dictionary of string representations of constructed objects
             var objectStringsCache = new Dictionary<ConstructedConfigurationObject, string>();
 
-            // Take all mappings to symmetry classes
-            var normalOrderOfAddedObjects = configuration.LooseObjectsHolder.GetSymmetryMappings()
+            // Take all isomorphic mappings
+            var normalOrderOfAddedObjects = configuration.LooseObjectsHolder.GetIsomorphicMappings()
                 // For a given mapping take the constructed objects
                 .Select(mapping => configuration.ConstructedObjects
                     // Reconstruct them
@@ -98,10 +98,10 @@ namespace GeoGen.ConfigurationGenerator
                 // And unwrap the order
                 .permutation;
 
-            // The configuration is correct if and only if its order of added objects is the normal object
-            // Therefore the take the constructed objects
+            // The configuration is correct if and only if its order of added objects is the normal order
+            // Therefore from the constructed objects
             return !configuration.ConstructedObjects
-                // From the ones that have been added
+                // Take the ones that have been added
                 .ItemsBetween(_initialObjects.Count, configuration.ConstructedObjects.Count)
                 // And sequentially compare them with the normal order
                 .SequenceEqual(normalOrderOfAddedObjects);

@@ -1,9 +1,12 @@
 ﻿using GeoGen.ConfigurationGenerator;
 using GeoGen.Infrastructure;
 using GeoGen.ProblemGenerator;
+using GeoGen.ProblemGenerator.InputProvider;
 using GeoGen.TheoremFinder;
+using GeoGen.TheoremProver;
+using GeoGen.TheoremProver.InferenceRuleProvider;
+using GeoGen.TheoremProver.ObjectIntroductionRuleProvider;
 using GeoGen.TheoremRanker;
-using GeoGen.TheoremSorter;
 using System;
 
 namespace GeoGen.MainLauncher
@@ -31,11 +34,6 @@ namespace GeoGen.MainLauncher
         public InferenceRuleProviderSettings InferenceRuleProviderSettings { get; }
 
         /// <summary>
-        /// The settings for <see cref="SimplificationRuleProvider"/>.
-        /// </summary>
-        public SimplificationRuleProviderSettings SimplificationRuleProviderSettings { get; }
-
-        /// <summary>
         /// The settings for <see cref="ObjectIntroductionRuleProvider"/>.
         /// </summary>
         public ObjectIntroductionRuleProviderSettings ObjectIntroductionRuleProviderSettings { get; }
@@ -46,14 +44,14 @@ namespace GeoGen.MainLauncher
         public ProblemGenerationRunnerSettings ProblemGenerationRunnerSettings { get; }
 
         /// <summary>
+        /// The settings for <see cref="TheoremSorterTypeResolver"/>.
+        /// </summary>
+        public TheoremSorterTypeResolverSettings TheoremSorterTypeResolverSettings { get; }
+
+        /// <summary>
         /// The settings for <see cref="ProblemGenerator.ProblemGenerator"/>.
         /// </summary>
         public ProblemGeneratorSettings ProblemGeneratorSettings { get; }
-
-        /// <summary>
-        /// The settings for <see cref="TheoremSorter.TheoremSorter"/>.
-        /// </summary>
-        public TheoremSorterSettings TheoremSorterSettings { get; }
 
         /// <summary>
         /// The settings for the theorem finder module.
@@ -61,9 +59,14 @@ namespace GeoGen.MainLauncher
         public TheoremFindingSettings TheoremFindingSettings { get; }
 
         /// <summary>
-        /// The settings for the theorem ranker module.
+        /// The settings for <see cref="TheoremRanker.TheoremRanker"/>.
         /// </summary>
-        public TheoremRankingSettings TheoremRankingSettings { get; }
+        public TheoremRankerSettings TheoremRankerSettings { get; }
+
+        /// <summary>
+        /// The settings for <see cref="TheoremProver.TheoremProver"/>.
+        /// </summary>
+        public TheoremProverSettings TheoremProverSettings { get; }
 
         /// <summary>
         /// The settings for the generator module.
@@ -120,13 +123,13 @@ namespace GeoGen.MainLauncher
         /// <param name="loggingSettings">The settings for the logging system.</param>
         /// <param name="problemGeneratorInputProviderSettings">The settings for <see cref="ProblemGeneratorInputProvider"/>.</param>
         /// <param name="inferenceRuleProviderSettings">The settings for <see cref="InferenceRuleProvider"/>.</param>
-        /// <param name="simplificationRuleProviderSettings">The settings for <see cref="SimplificationRuleProvider"/>.</param>
         /// <param name="objectIntroductionRuleProviderSettings">The settings for <see cref="ObjectIntroductionRuleProvider"/>.</param>
         /// <param name="problemGenerationRunnerSettings">The settings for <see cref="ProblemGenerationRunner"/>.</param>
+        /// <param name="theoremSorterTypeResolverSettings">The settings for <see cref="TheoremSorterTypeResolver"/>.</param>
         /// <param name="problemGeneratorSettings">The settings for <see cref="ProblemGenerator.ProblemGenerator"/>.</param>
-        /// <param name="theoremSorterSettings">The settings for <see cref="TheoremSorter.TheoremSorter"/>.</param>
         /// <param name="theoremFindingSettings">The settings for the theorem finder module.</param>
-        /// <param name="theoremRankingSettings">The settings for the theorem ranker module.</param>
+        /// <param name="theoremRankerSettings">The settings for <see cref="TheoremRanker.TheoremRanker"/>.</param>
+        /// <param name="theoremProverSettings">The settings for <see cref="TheoremProver.TheoremProver"/>.</param>
         /// <param name="generationSettings">The settings for the generator module.</param>
         /// <param name="traceConstructorFailures">Indicates whether tracing of constructor failures is on.</param>
         /// <param name="constructorFailureTracerSettings">The settings for <see cref="ConstructorFailureTracer"/>. This value can be null if we don't want to trace them.</param>
@@ -139,13 +142,13 @@ namespace GeoGen.MainLauncher
         public Settings(LoggingSettings loggingSettings,
                         ProblemGeneratorInputProviderSettings problemGeneratorInputProviderSettings,
                         InferenceRuleProviderSettings inferenceRuleProviderSettings,
-                        SimplificationRuleProviderSettings simplificationRuleProviderSettings,
                         ObjectIntroductionRuleProviderSettings objectIntroductionRuleProviderSettings,
                         ProblemGenerationRunnerSettings problemGenerationRunnerSettings,
+                        TheoremSorterTypeResolverSettings theoremSorterTypeResolverSettings,
                         ProblemGeneratorSettings problemGeneratorSettings,
-                        TheoremSorterSettings theoremSorterSettings,
                         TheoremFindingSettings theoremFindingSettings,
-                        TheoremRankingSettings theoremRankingSettings,
+                        TheoremRankerSettings theoremRankerSettings,
+                        TheoremProverSettings theoremProverSettings,
                         GenerationSettings generationSettings,
                         bool traceConstructorFailures,
                         ConstructorFailureTracerSettings constructorFailureTracerSettings,
@@ -160,13 +163,13 @@ namespace GeoGen.MainLauncher
             LoggingSettings = loggingSettings ?? throw new ArgumentNullException(nameof(loggingSettings));
             ProblemGeneratorInputProviderSettings = problemGeneratorInputProviderSettings ?? throw new ArgumentNullException(nameof(problemGeneratorInputProviderSettings));
             InferenceRuleProviderSettings = inferenceRuleProviderSettings ?? throw new ArgumentNullException(nameof(inferenceRuleProviderSettings));
-            SimplificationRuleProviderSettings = simplificationRuleProviderSettings ?? throw new ArgumentNullException(nameof(simplificationRuleProviderSettings));
             ObjectIntroductionRuleProviderSettings = objectIntroductionRuleProviderSettings ?? throw new ArgumentNullException(nameof(objectIntroductionRuleProviderSettings));
             ProblemGenerationRunnerSettings = problemGenerationRunnerSettings ?? throw new ArgumentNullException(nameof(problemGenerationRunnerSettings));
+            TheoremSorterTypeResolverSettings = theoremSorterTypeResolverSettings ?? throw new ArgumentNullException(nameof(theoremSorterTypeResolverSettings));
             ProblemGeneratorSettings = problemGeneratorSettings ?? throw new ArgumentNullException(nameof(problemGeneratorSettings));
-            TheoremSorterSettings = theoremSorterSettings ?? throw new ArgumentNullException(nameof(theoremSorterSettings));
             TheoremFindingSettings = theoremFindingSettings ?? throw new ArgumentNullException(nameof(theoremFindingSettings));
-            TheoremRankingSettings = theoremRankingSettings ?? throw new ArgumentNullException(nameof(theoremRankingSettings));
+            TheoremRankerSettings = theoremRankerSettings ?? throw new ArgumentNullException(nameof(theoremRankerSettings));
+            TheoremProverSettings = theoremProverSettings ?? throw new ArgumentNullException(nameof(theoremProverSettings));
             GenerationSettings = generationSettings ?? throw new ArgumentNullException(nameof(generationSettings));
             TraceConstructorFailures = traceConstructorFailures;
             ConstructorFailureTracerSettings = constructorFailureTracerSettings;

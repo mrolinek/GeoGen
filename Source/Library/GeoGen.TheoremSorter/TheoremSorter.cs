@@ -15,9 +15,9 @@ namespace GeoGen.TheoremSorter
     /// numerically via <see cref="IGeometryConstructor"/>. If there are two geometrically equal theorems, then the
     /// following resolution algorithm is used:
     /// <list type="number">
-    /// <item>If there is a theorem with a higher ranking, then this one is picked.</item>
-    /// <item>If there is a theorem with a smaller number of numbers, then this one is picked.</item>
+    /// <item>If there is a theorem with a smaller number of objects, then this one is picked.</item>
     /// <item>If there is a theorem with a smaller number of points, then this one is picked.</item>
+    /// <item>If there is a theorem with a higher ranking, then this one is picked.</item>
     /// <item>Otherwise there is a tie which is resolved by taking the older one.</item>
     /// </list>
     /// While constructing theorems configuration isomorphism is taken into account. Therefore for example the fact that
@@ -75,16 +75,20 @@ namespace GeoGen.TheoremSorter
         /// <summary>
         /// Initializes a new instance of the <see cref="TheoremSorter"/> class.
         /// </summary>
-        /// <param name="settings">The settings for the sorter.</param>
         /// <param name="constructor">The constructor used to geometrically compare theorems.</param>
         /// <param name="tracer">The tracer of geometry failure.</param>
-        public TheoremSorter(TheoremSorterSettings settings, IGeometryConstructor constructor, ISortingGeometryFailureTracer tracer)
+        /// <param name="numberOfTheorems">The maximal number of theorems that will be tracked.</param>
+        public TheoremSorter(IGeometryConstructor constructor, ISortingGeometryFailureTracer tracer, int numberOfTheorems)
         {
             _constructor = constructor ?? throw new ArgumentNullException(nameof(constructor));
             _tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
 
+            // Ensure the number of theorems is positive
+            if (numberOfTheorems <= 0)
+                throw new ArgumentOutOfRangeException(nameof(numberOfTheorems), "The maximal number of theorem to be tracked must be at least 1");
+
             // Initialize the ladder with the requested capacity
-            _ladder = new RankingLadder<RankedTheorem, TheoremRanking>(capacity: settings.NumberOfTheorems);
+            _ladder = new RankingLadder<RankedTheorem, TheoremRanking>(capacity: numberOfTheorems);
         }
 
         #endregion
@@ -162,22 +166,6 @@ namespace GeoGen.TheoremSorter
         /// <returns>true, if we should replace the current theorem; false otherwise.</returns>
         private bool ShouldWeReplace(RankedTheorem currentTheorem, RankedTheorem newTheorem)
         {
-            #region Ranking
-
-            // Find the rankings
-            var currentTheoremRanking = currentTheorem.Ranking.TotalRanking.Rounded();
-            var newTheoremRanking = newTheorem.Ranking.TotalRanking.Rounded();
-
-            // If the current theorem has a smaller ranking, then yes
-            if (currentTheoremRanking < newTheoremRanking)
-                return true;
-
-            // If the current theorem has a higher ranking, then no
-            if (currentTheoremRanking > newTheoremRanking)
-                return false;
-
-            #endregion
-
             #region Number of objects
 
             // Find the counts
@@ -210,6 +198,22 @@ namespace GeoGen.TheoremSorter
 
             #endregion
 
+            #region Ranking
+
+            // Find the rankings
+            var currentTheoremRanking = currentTheorem.Ranking.TotalRanking.Rounded();
+            var newTheoremRanking = newTheorem.Ranking.TotalRanking.Rounded();
+
+            // If the current theorem has a smaller ranking, then yes
+            if (currentTheoremRanking < newTheoremRanking)
+                return true;
+
+            // If the current theorem has a higher ranking, then no
+            if (currentTheoremRanking > newTheoremRanking)
+                return false;
+
+            #endregion
+
             // Otherwise we have an unresolvable tie. It's better to say we don't need any replacement as it involves less work
             return false;
         }
@@ -236,7 +240,7 @@ namespace GeoGen.TheoremSorter
             var plainConfiguration = new Configuration(holder, Array.Empty<ConstructedConfigurationObject>());
 
             // We can construct it now in 1 picture and generation style
-            picture = _constructor.Construct(plainConfiguration, numberOfPictures: 1, LooseObjectDrawingStyle.GenerationFriendly)
+            picture = _constructor.ConstructWithUniformLayout(plainConfiguration, numberOfPictures: 1)
                 // And take the picture
                 .pictures.First();
 
@@ -272,8 +276,8 @@ namespace GeoGen.TheoremSorter
             // Prepare the variable that will hold the analytic theorem corresponding to the current one
             AnalyticTheorem analyticPassedTheorem = null;
 
-            // Go through the symmetric mappings of the current loose objects
-            foreach (var looseObjectMapping in _looseObjectHolders[picture].GetSymmetryMappings())
+            // Go through the isomorphic mappings of the current loose objects
+            foreach (var looseObjectMapping in _looseObjectHolders[picture].GetIsomorphicMappings())
             {
                 // Find out if this is an identity
                 var isThisIdentity = looseObjectMapping.All(pair => pair.Key == pair.Value);

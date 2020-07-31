@@ -23,10 +23,28 @@ namespace GeoGen.DrawingLauncher
         public double ShiftLength { get; }
 
         /// <summary>
-        /// The margin by which the calculated bounding box of all the points is shifted.
-        /// The use-case for this is to accommodate labels which are drawn after the objects.
+        /// The minimal width that a picture must have before we decide to be clipping it because
+        /// it is too large (most likely because of circles).
         /// </summary>
-        public double BoundingBoxOffset { get; }
+        public double MinimalWidthForClipping { get; }
+
+        /// <summary>
+        /// The minimal height that a picture must have before we decide to be clipping it because
+        /// it is too large (most likely because of circles).
+        /// </summary>
+        public double MinimalHeightForClipping { get; }
+
+        /// <summary>
+        /// The minimal angle in degrees corresponding to the arc that might be clipped because the 
+        /// circle makes the figure large.
+        /// </summary>
+        public double MinimalAngleOfClippedCircleArc { get; }
+
+        /// <summary>
+        /// The scale that is applied to the bounding box enclosing all the points of the figure.
+        /// The idea is to set this value so that the scaled box includes potential point labels.
+        /// </summary>
+        public double PointBoundingBoxScale { get; }
 
         /// <summary>
         /// The name of the macro that draws the label for a point and accepts two arguments,
@@ -64,17 +82,22 @@ namespace GeoGen.DrawingLauncher
         /// <summary>
         /// Initializes a new instance of the <see cref="MetapostDrawingData"/> class.
         /// </summary>
-        /// <param name="scaleVariable">The name of the variable that represents how much we should scale every point.</param>
-        /// <param name="shiftLength">The length by which shifted segments or lines should be shifted beyond a point. </param>
-        /// <param name="boundingBoxOffset">The margin by which the calculated bounding box of all the points is shifted.</param>
-        /// <param name="pointLabelMacro">The name of the macro that draws the label for a point and accepts two arguments, the label picture and the point where it should draw it.</param>
-        /// <param name="pointMarkMacros">The dictionary mapping drawing styles to names of point mark macros handling this style.</param>
-        /// <param name="lineSegmentMacros">The dictionary mapping drawing styles to names of segment mark macros handling this style.</param>
-        /// <param name="circleMacros">The dictionary mapping drawing styles to names of circle macros handling this style.</param>
-        /// <param name="textMacro">The name of the macro that accepts one text parameter and draws it.</param>
+        /// <param name="scaleVariable"><inheritdoc cref="ScaleVariable" path="/summary"/></param>
+        /// <param name="shiftLength"><inheritdoc cref="ShiftLength" path="/summary"/></param>
+        /// <param name="minimalWidthForClipping"><inheritdoc cref="MinimalWidthForClipping" path="/summary"/></param>
+        /// <param name="minimalHeightForClipping"><inheritdoc cref="MinimalHeightForClipping" path="/summary"/></param>
+        /// <param name="pointBoundingBoxScale"><inheritdoc cref="PointBoundingBoxScale" path="/summary"/></param>
+        /// <param name="pointLabelMacro"><inheritdoc cref="PointLabelMacro" path="/summary"/></param>
+        /// <param name="pointMarkMacros"><inheritdoc cref="PointMarkMacros" path="/summary"/></param> 
+        /// <param name="lineSegmentMacros"><inheritdoc cref="LineSegmentMacros" path="/summary"/></param>
+        /// <param name="circleMacros"><inheritdoc cref="CircleMacros" path="/summary"/></param>
+        /// <param name="textMacro"><inheritdoc cref="TextMacro" path="/summary"/></param>
         public MetapostDrawingData(string scaleVariable,
                                    double shiftLength,
-                                   double boundingBoxOffset,
+                                   double minimalWidthForClipping,
+                                   double minimalHeightForClipping,
+                                   double minimalAngleOfClippedCircleArc,
+                                   double pointBoundingBoxScale,
                                    string pointLabelMacro,
                                    IReadOnlyDictionary<ObjectDrawingStyle, string> pointMarkMacros,
                                    IReadOnlyDictionary<ObjectDrawingStyle, string> lineSegmentMacros,
@@ -83,7 +106,10 @@ namespace GeoGen.DrawingLauncher
         {
             ScaleVariable = scaleVariable ?? throw new ArgumentNullException(nameof(scaleVariable));
             ShiftLength = shiftLength;
-            BoundingBoxOffset = boundingBoxOffset;
+            MinimalWidthForClipping = minimalWidthForClipping;
+            MinimalHeightForClipping = minimalHeightForClipping;
+            MinimalAngleOfClippedCircleArc = minimalAngleOfClippedCircleArc;
+            PointBoundingBoxScale = pointBoundingBoxScale;
             PointLabelMacro = pointLabelMacro ?? throw new ArgumentNullException(nameof(pointLabelMacro));
             PointMarkMacros = pointMarkMacros ?? throw new ArgumentNullException(nameof(pointMarkMacros));
             LineSegmentMacros = lineSegmentMacros ?? throw new ArgumentNullException(nameof(lineSegmentMacros));
@@ -94,9 +120,21 @@ namespace GeoGen.DrawingLauncher
             if (shiftLength <= 0)
                 throw new ArgumentOutOfRangeException(nameof(shiftLength), "The shift length must be positive.");
 
-            // Ensure the bounding box offset is positive
-            if (boundingBoxOffset <= 0)
-                throw new ArgumentOutOfRangeException(nameof(boundingBoxOffset), "The bounding box offset must be positive.");
+            // Ensure the minimal clipping width is non-negative
+            if (minimalWidthForClipping < 0)
+                throw new ArgumentOutOfRangeException(nameof(minimalWidthForClipping), "The minimal clipping width must be at least 0.");
+
+            // Ensure the minimal clipping height is non-negative
+            if (minimalHeightForClipping < 0)
+                throw new ArgumentOutOfRangeException(nameof(minimalHeightForClipping), "The minimal clipping height must be at least 0.");
+
+            // Ensure the bounding box cut threshold is in [0, 360)
+            if (minimalAngleOfClippedCircleArc < 0 || minimalAngleOfClippedCircleArc >= 360)
+                throw new ArgumentOutOfRangeException(nameof(minimalAngleOfClippedCircleArc), "The minimal angle of a clipped circle arc must be in [0, 360).");
+
+            // Ensure the point bounding box scale is at least 1
+            if (pointBoundingBoxScale < 1)
+                throw new ArgumentOutOfRangeException(nameof(pointBoundingBoxScale), "The point bounding box scale must be at least 1.");
         }
 
         #endregion

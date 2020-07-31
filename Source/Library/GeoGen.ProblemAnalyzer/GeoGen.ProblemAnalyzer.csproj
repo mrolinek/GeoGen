@@ -13,7 +13,6 @@
     <ProjectReference Include="..\GeoGen.ProblemGenerator\GeoGen.ProblemGenerator.csproj" />
     <ProjectReference Include="..\GeoGen.TheoremProver\GeoGen.TheoremProver.csproj" />
     <ProjectReference Include="..\GeoGen.TheoremRanker\GeoGen.TheoremRanker.csproj" />
-    <ProjectReference Include="..\GeoGen.TheoremSimplifier\GeoGen.TheoremSimplifier.csproj" />
   </ItemGroup>
 
 </Project>

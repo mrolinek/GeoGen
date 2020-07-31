@@ -45,21 +45,20 @@ namespace GeoGen.DrawingLauncher
         public bool IncludeRanking { get; }
 
         /// <summary>
-        /// The command used to compile the created MetaPost file. The path to the created file will be appended 
-        /// to the end of the arguments.
+        /// The command used to compile MetaPost files.
         /// </summary>
-        public (string program, string arguments) CompilationCommand { get; }
+        public string MetapostCompilationCommand { get; }
+
+        /// <summary>
+        /// The arguments passed to the compilation command.
+        /// </summary>
+        public string MetapostCompilationArguments { get; }
 
         /// <summary>
         /// The command that will be called after the compilation, if it's not null. It will be called with two
         /// arguments: The id of the starting picture and the number of generated pictures.
         /// </summary>
         public string PostcompilationCommand { get; }
-
-        /// <summary>
-        /// Indicates whether we should log the output provided by the compilation and post-compilation command.
-        /// </summary>
-        public bool LogCommandOutput { get; }
 
         /// <summary>
         /// The number of pictures that are drawn for a single configuration in order to find the best looking one.
@@ -73,23 +72,23 @@ namespace GeoGen.DrawingLauncher
         /// <summary>
         /// Initializes a new instance of the <see cref="MetapostDrawerSettings"/> class.
         /// </summary>
-        /// <param name="drawingData">The data with MetaPost-related commands.</param>
-        /// <param name="metapostCodeFilePath">The path to the file that will be created and then compiled.</param>
-        /// <param name="metapostMacroLibraryPath">The relative or absolute path to the MetaPost library that is loaded at the end of the created file.</param>
-        /// <param name="constructionTextMacroPrefix">The prefix for the macros handling conversion of constructed object definitions to human-readable text. (see <see cref="ConstructionTextMacroPrefix"/>.)</param>
-        /// <param name="rankingTableMacro">The name of the macro that accepts strings representing ranking. (see <see cref="RankingTableMacro"/>).</param>
-        /// <param name="includeRanking">Indicates whether we should draw figures with the ranking of the theorem.</param>
-        /// <param name="compilationCommand">The command used to compile the created MetaPost file.</param>
-        /// <param name="postcompilationCommand">The command that will be called after the compilation, if it's not null. (see <see cref="PostcompilationCommand"/>.)</param>
-        /// <param name="logCommandOutput">Indicates whether we should log the output provided by the compilation and post-compilation command.</param>
-        /// <param name="numberOfPictures">The number of pictures that are drawn for a single configuration in order to find the best looking one.</param>
+        /// <param name="drawingData"><inheritdoc cref="DrawingData" path="/summary"/></param>
+        /// <param name="metapostCodeFilePath"><inheritdoc cref="MetapostCodeFilePath" path="/summary"/></param>
+        /// <param name="metapostMacroLibraryPath"><inheritdoc cref="MetapostMacroLibraryPath" path="/summary"/></param>
+        /// <param name="constructionTextMacroPrefix"><inheritdoc cref="ConstructionTextMacroPrefix" path="/summary"/></param>
+        /// <param name="rankingTableMacro"><inheritdoc cref="RankingTableMacro" path="/summary"/></param>
+        /// <param name="includeRanking"><inheritdoc cref="IncludeRanking" path="/summary"/></param>
+        /// <param name="metapostCompilationCommand"><inheritdoc cref="MetapostCompilationCommand" path="/summary"/></param>
+        /// <param name="metapostCompilationArguments"><inheritdoc cref="MetapostCompilationArguments" path="/summary"/></param>
+        /// <param name="numberOfPictures"><inheritdoc cref="NumberOfPictures" path="/summary"/></param>
         public MetapostDrawerSettings(MetapostDrawingData drawingData,
                                       string metapostCodeFilePath,
                                       string metapostMacroLibraryPath,
                                       string constructionTextMacroPrefix,
                                       string rankingTableMacro,
                                       bool includeRanking,
-                                      (string program, string arguments) compilationCommand,
+                                      string metapostCompilationCommand,
+                                      string metapostCompilationArguments,
                                       string postcompilationCommand,
                                       bool logCommandOutput,
                                       int numberOfPictures)
@@ -100,9 +99,10 @@ namespace GeoGen.DrawingLauncher
             ConstructionTextMacroPrefix = constructionTextMacroPrefix ?? throw new ArgumentNullException(nameof(drawingData));
             RankingTableMacro = rankingTableMacro ?? throw new ArgumentNullException(nameof(rankingTableMacro));
             IncludeRanking = includeRanking;
-            CompilationCommand = compilationCommand;
+            MetapostCompilationCommand = metapostCompilationCommand ?? throw new ArgumentNullException(nameof(metapostCompilationCommand));
+            MetapostCompilationArguments = metapostCompilationArguments ?? throw new ArgumentNullException(nameof(metapostCompilationArguments));
             PostcompilationCommand = postcompilationCommand;
-            LogCommandOutput = logCommandOutput;
+            RankingTableMacro = rankingTableMacro ?? throw new ArgumentNullException(nameof(rankingTableMacro));
             NumberOfPictures = numberOfPictures;
 
             // Ensure there are some pictures

@@ -15,7 +15,7 @@ using static GeoGen.Infrastructure.Log;
 namespace GeoGen.DrawingLauncher
 {
     /// <summary>
-    /// Represents a drawer that generates MetaPost figures.
+    /// Represents an <see cref="IDrawer"/> that generates MetaPost figures.
     /// </summary>
     public class MetapostDrawer : IDrawer
     {
@@ -40,6 +40,12 @@ namespace GeoGen.DrawingLauncher
         /// </summary>
         private readonly IGeometryConstructor _constructor;
 
+        /// <summary>
+        /// The verifier of theorems used for making sure we will not draw an 
+        /// incorrect orientation-based theorems.
+        /// </summary>
+        private readonly IGeometricTheoremVerifier _verifier;
+
         #endregion
 
         #region Constructor
@@ -47,14 +53,16 @@ namespace GeoGen.DrawingLauncher
         /// <summary>
         /// Initializes a new instance of the <see cref="MetapostDrawer"/> class.
         /// </summary>
-        /// <param name="data">The data for the drawer.</param>
-        /// <param name="settings">The settings for the drawer.</param>
-        /// <param name="constructor">The constructor that calculates coordinates for us.</param>
-        public MetapostDrawer(MetapostDrawerSettings settings, MetapostDrawerData data, IGeometryConstructor constructor)
+        /// <param name="settings"><inheritdoc cref="_settings" path="/summary"/></param>
+        /// <param name="data"><inheritdoc cref="_data" path="/summary"/></param>
+        /// <param name="constructor"><inheritdoc cref="_constructor" path="/summary"/></param>
+        /// <param name="verifier"><inheritdoc cref="_verifier" path="/summary"/></param>
+        public MetapostDrawer(MetapostDrawerSettings settings, MetapostDrawerData data, IGeometryConstructor constructor, IGeometricTheoremVerifier verifier)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _data = data ?? throw new ArgumentNullException(nameof(data));
             _constructor = constructor ?? throw new ArgumentNullException(nameof(constructor));
+            _verifier = verifier ?? throw new ArgumentNullException(nameof(verifier));
         }
 
         #endregion
@@ -64,13 +72,37 @@ namespace GeoGen.DrawingLauncher
         /// <inheritdoc/>
         public async Task DrawAsync(IEnumerable<RankedTheorem> rankedTheorems, int startingId)
         {
-            // Create figures from configuration-theorem pair
-            var figures = rankedTheorems.Select((theorem, index) => CreateFigure(theorem, index + startingId)).ToArray();
+            // Create figures from ranked theorems
+            var figures = rankedTheorems
+                // We will want the index too
+                .Select((theorem, index) =>
+                {
+                    // Calculate the index of the current picture
+                    var currentIndex = startingId + index;
+
+                    try
+                    {
+                        // Safely try to create the current figure
+                        return (figure: CreateFigure(theorem, currentIndex), index: currentIndex);
+                    }
+                    catch (Exception e)
+                    {
+                        // If there is an exception, we will not want to crash the application. Just make aware 
+                        LoggingManager.LogError($"Picture number {currentIndex} couldn't be constructed.\n\n{e}\n");
+
+                        // Return the default value
+                        return default;
+                    }
+                })
+                // That successfully drawn figures
+                .Where(pair => pair != default)
+                // Enumerate    
+                .ToArray();
 
             #region Writing code file
 
             // Get the code for them 
-            var code = CreateCode(figures, startingId);
+            var code = CreateCode(figures);
 
             try
             {
@@ -88,12 +120,12 @@ namespace GeoGen.DrawingLauncher
             #region Compiling
 
             // Construct the command with parameters
-            var command = $"{_settings.CompilationCommand.program} \"{_settings.MetapostCodeFilePath}\"";
+            var command = $"{_settings.MetapostCompilationCommand} \"{_settings.MetapostCodeFilePath}\"";
 
             // Run the compilation command
-            var (exitCode, output, errors) = await ProcessUtilities.RunCommandAsync(_settings.CompilationCommand.program,
+            var (exitCode, output, errors) = await ProcessUtilities.RunCommandAsync(_settings.MetapostCompilationCommand,
                 // With the appended file path at the end
-                arguments: $"{_settings.CompilationCommand.arguments} \"{_settings.MetapostCodeFilePath}\"");
+                arguments: $"{_settings.MetapostCompilationArguments} \"{_settings.MetapostCodeFilePath}\"");
 
             // If the error code is not OK, i.e. not zero, make aware
             if (exitCode != 0)
@@ -121,35 +153,30 @@ namespace GeoGen.DrawingLauncher
         }
 
         /// <summary>
-        /// Constructs a figure for a given ranked theorem.
+        /// Constructs a figure for a given ranked theorem that will be compiled.
         /// </summary>
         /// <param name="rankedTheorem">The ranked theorem for which we're drawing a figure.</param>
-        /// <param name="id">The id of the figure.</param>
+        /// <param name="id">The id of the figure, used only to log potential problems.</param>
         /// <returns>The MetaPost figure.</returns>
         private MetapostFigure CreateFigure(RankedTheorem rankedTheorem, int id)
         {
-            // Safely execute
-            var (pictures, constructionData) = GeneralUtilities.TryExecute(
-                // Constructing the configuration
-                () => _constructor.Construct(rankedTheorem.Configuration, _settings.NumberOfPictures, LooseObjectDrawingStyle.Standard),
-                // Make sure a potential exception is caught and re-thrown
-                (InconsistentPicturesException e) => throw new ConstructionException("Drawing of the initial configuration failed.", e));
+            // Construct flexible symmetry-aware pictures
+            var pictures = _constructor.ConstructWithFlexibleLayoutRespectingSymmetry(rankedTheorem, _settings.NumberOfPictures);
 
-            // Make sure there is no inconstructible object
-            if (constructionData.InconstructibleObject != default)
-                throw new ConstructionException("The configuration cannot be constructed, because it contains an inconstructible object.");
-
-            // Make sure there are no duplicates
-            if (constructionData.Duplicates != default)
-                throw new ConstructionException("The configuration cannot be constructed, because it contains duplicate objects");
+            // Prepare the list of drawing exceptions
+            var exceptions = new List<Exception>();
 
             // Construct the ranked figures by going through the pictures
             var rankedFigures = pictures.Select(picture =>
                 {
                     try
                     {
+                        // Before anything, make sure the theorem is true in the picture
+                        if (!_verifier.IsTrueInAllPictures(new Pictures(new[] { picture }), rankedTheorem.Theorem))
+                            throw new DrawingLauncherException($"The theorem is not true in a generated picture.");
+
                         // Try to construct the figure
-                        var figure = ConstructFigure(rankedTheorem, picture);
+                        var figure = CreateFigureFromAnalyticPicture(rankedTheorem, picture);
 
                         // Rank it
                         var rank = figure.CalculateVisualBadness();
@@ -159,11 +186,8 @@ namespace GeoGen.DrawingLauncher
                     }
                     catch (Exception e)
                     {
-                        // Make aware if there is a weird problem
-                        LoggingManager.LogWarning($"A problem with picture number {id}. The message: {e.Message}\n");
-
-                        // Log the exception as a debug message
-                        LoggingManager.LogDebug(e.ToString());
+                        // If there is a problem, safe the exception
+                        exceptions.Add(e);
 
                         // Return the default value indicating something didn't work
                         return default;
@@ -173,6 +197,23 @@ namespace GeoGen.DrawingLauncher
                 .Where(pair => pair != default)
                 // Enumerate
                 .ToArray();
+
+            // Take the exception message and string version
+            exceptions.Select(exception => (exception.Message, asString: exception.ToString()))
+                // Group equal ones
+                .GroupBy(pair => pair)
+                // Log with the occurrence count
+                .ForEach(group =>
+                {
+                    // Get the message and string version
+                    var (message, exceptionString) = group.Key;
+
+                    // Make aware of the problem with the number of these exceptions
+                    LoggingManager.LogWarning($"{group.Count()} exception(s) while constructing picture number {id}. The message: {message}\n");
+
+                    // Log the exception as a debug message
+                    LoggingManager.LogDebug(exceptionString);
+                });
 
             // If there are no figures, make aware
             if (rankedFigures.IsEmpty())
@@ -196,7 +237,7 @@ namespace GeoGen.DrawingLauncher
         /// <param name="rankedTheorem">The ranked theorem for which we're drawing a figure.</param>
         /// <param name="picture">The picture with analytic representations of the objects.</param>
         /// <returns>The constructed MetaPost figure.</returns>
-        private MetapostFigure ConstructFigure(RankedTheorem rankedTheorem, Picture picture)
+        private MetapostFigure CreateFigureFromAnalyticPicture(RankedTheorem rankedTheorem, Picture picture)
         {
             // Get the configuration and theorem for comfort
             var configuration = rankedTheorem.Configuration;
@@ -213,17 +254,20 @@ namespace GeoGen.DrawingLauncher
             // Switch based on the loose objects layout
             switch (configuration.LooseObjectsHolder.Layout)
             {
-                // Triangle case
+                // Triangle and quadrilateral cases
                 case LooseObjectLayout.Triangle:
+                case LooseObjectLayout.Quadrilateral:
 
-                    // In this case we have three points
+                    // In these cases we have points
                     var points = looseObjects.Cast<Point>().ToArray();
 
                     // We want to mark each as a normal object
                     points.ForEach(point => figure.AddPoint(point, ObjectDrawingStyle.NormalObject));
 
-                    // And also draw the actual triangle
-                    points.UnorderedPairs().ForEach(pair => figure.AddSegment(pair.Item1, pair.Item2, ObjectDrawingStyle.NormalObject, shifted: false));
+                    // And draw cyclical segments
+                    Enumerable.Range(0, points.Length).Select(i => (points[i], points[(i + 1) % points.Length]))
+                        // Each is added as a normal object
+                        .ForEach(pair => figure.AddSegment(pair.Item1, pair.Item2, ObjectDrawingStyle.NormalObject, shifted: false));
 
                     break;
 
@@ -497,7 +541,7 @@ namespace GeoGen.DrawingLauncher
 
                     // Make sure there is one
                     if (intersections.Length != 1)
-                        throw new DrawingLauncherException("This circles should have been tangent according to the theorem.");
+                        throw new DrawingLauncherException("These circles should have been tangent according to the theorem.");
 
                     // Get the intersection
                     var intersection = intersections[0];
@@ -613,8 +657,8 @@ namespace GeoGen.DrawingLauncher
                 // Get the analytic version
                 var analyticObject = picture.Get(configurationObject);
 
-                // Add the label with the TeX dollars
-                figure.AddLabel(analyticObject, $"${formatter.GetObjectName(configurationObject)}$");
+                // Add the label
+                figure.AddLabel(analyticObject, formatter.GetObjectName(configurationObject));
             });
 
             #endregion
@@ -729,6 +773,19 @@ namespace GeoGen.DrawingLauncher
             // If we are supposed to include ranking, do it
             if (_settings.IncludeRanking)
             {
+                // A local function that returns nice names of individual rankings
+                static string RankedAspectName(RankedAspect aspect) => aspect switch
+                {
+                    // Theorems count
+                    RankedAspect.NumberOfTheorems => "Number of theorems",
+
+                    // Cyclic quadrilaterals
+                    RankedAspect.NumberOfCyclicQuadrilaterals => "Cyclic quadrilaterals",
+
+                    // By default use the string
+                    _ => aspect.ToString()
+                };
+
                 // Prepare the ranking table by calling the macro for the ranking table
                 var rank = $"{_settings.RankingTableMacro}(" +
                     // Now we will append individual rankings
@@ -736,7 +793,7 @@ namespace GeoGen.DrawingLauncher
                         // Sorted by the contribution
                         .OrderBy(pair => -pair.Value.Contribution)
                         // Now we can convert each to a single string with these 4 values. Add the type first
-                        .Select(pair => $"\"{pair.Key}\"," +
+                        .Select(pair => $"\"{RankedAspectName(pair.Key)}\"," +
                             // Append the ranking
                             $"\"${pair.Value.Ranking.ToStringWithDecimalDot()}$\"," +
                             // Append the weight
@@ -776,10 +833,9 @@ namespace GeoGen.DrawingLauncher
         /// <summary>
         /// The method that generates the actual MetaPost code to be complied. 
         /// </summary>
-        /// <param name="figures">The figures to be drawn.</param>
-        /// <param name="startingId">The id of the first figure. Others will be identified consecutively.</param>
+        /// <param name="identifiedFigures">The figures with their ids to be drawn.</param>
         /// <returns>A compilable MetaPost code of the figures.</returns>
-        private string CreateCode(IEnumerable<MetapostFigure> figures, int startingId)
+        private string CreateCode(IEnumerable<(MetapostFigure figure, int id)> identifiedFigures)
         {
             // Let's use StringBuilder for 'efficiency'
             var code = new StringBuilder();
@@ -788,10 +844,13 @@ namespace GeoGen.DrawingLauncher
             code.Append($"input \"{_settings.MetapostMacroLibraryPath}\"\n\n");
 
             // Append all the figures
-            figures.ForEach((figure, index) =>
+            identifiedFigures.ForEach(pair =>
             {
+                // Deconstruct
+                var (figure, index) = pair;
+
                 // Append the preamble
-                code.Append($"beginfig({startingId + index});\n\n");
+                code.Append($"beginfig({index});\n\n");
 
                 // Append the actual code of the picture using the provided drawing data
                 code.Append(figure.ToCode(_settings.DrawingData));

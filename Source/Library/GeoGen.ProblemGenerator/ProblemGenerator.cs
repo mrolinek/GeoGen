@@ -103,8 +103,8 @@ namespace GeoGen.ProblemGenerator
 
             // Safely execute
             var (initialPictures, initialData) = GeneralUtilities.TryExecute(
-                // Constructing the configuration suitable for generation
-                () => _constructor.Construct(input.InitialConfiguration, _settings.NumberOfPictures, LooseObjectDrawingStyle.GenerationFriendly),
+                // Constructing the configuration
+                () => _constructor.ConstructWithUniformLayout(input.InitialConfiguration, _settings.NumberOfPictures),
                 // Make sure a potential exception is caught and re-thrown
                 (InconsistentPicturesException e) => throw new InitializationException("Drawing the initial configuration failed.", e));
 
@@ -166,7 +166,7 @@ namespace GeoGen.ProblemGenerator
 
                 // Find out if we should exclude this configuration because of symmetry
                 // That can happen only if we are told to do so...
-                var excludeBecauseOfSymmetry = _settings.ExcludeAsymmetricConfigurations &&
+                var excludeBecauseOfSymmetry = input.ExcludeAsymmetricConfigurations &&
                     // And it is not true that we can generate some objects that would make this configuration symmetric
                     !configuration.GetObjectsThatWouldMakeThisConfigurationSymmetric()
                         // Find out if given objects to be added could really be added
@@ -316,7 +316,7 @@ namespace GeoGen.ProblemGenerator
 
                        // Find out if we should exclude this configuration based on symmetry which is 
                        // true if we are supposed to do so
-                       var excludeBecauseOfSymmetry = _settings.ExcludeAsymmetricConfigurations
+                       var excludeBecauseOfSymmetry = input.ExcludeAsymmetricConfigurations
                             // And this configuration is not on the last iteration. If it were, it would have
                             // been excluded already during the verification process
                             && configuration.IterationIndex != input.NumberOfIterations

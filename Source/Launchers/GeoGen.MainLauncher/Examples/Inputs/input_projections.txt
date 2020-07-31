@@ -1,0 +1,17 @@
+﻿Constructions:
+
+ Incenter
+ Circumcenter
+
+Initial configuration:
+
+ Triangle: A, B, C
+ D = PerpendicularProjectionOnLineFromPoints(A, B, C)
+ E = PerpendicularProjectionOnLineFromPoints(B, A, C)
+ F = PerpendicularProjectionOnLineFromPoints(C, A, B)
+
+Iterations: 1
+MaximalPoints: 1
+MaximalLines: 0
+MaximalCircles: 0
+GenerateOnlySymmetricConfigurations: false

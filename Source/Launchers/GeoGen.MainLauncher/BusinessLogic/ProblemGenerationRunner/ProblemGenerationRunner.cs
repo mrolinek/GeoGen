@@ -2,9 +2,11 @@
 using GeoGen.Infrastructure;
 using GeoGen.ProblemAnalyzer;
 using GeoGen.ProblemGenerator;
+using GeoGen.ProblemGenerator.InputProvider;
 using GeoGen.TheoremProver;
+using GeoGen.TheoremProver.InferenceRuleProvider;
 using GeoGen.TheoremRanker;
-using GeoGen.TheoremSorter;
+using GeoGen.TheoremRanker.RankedTheoremIO;
 using GeoGen.Utilities;
 using System;
 using System.Collections.Generic;
@@ -18,19 +20,24 @@ namespace GeoGen.MainLauncher
     /// <summary>
     /// Represents a runner of <see cref="IProblemGenerator"/> that subsequently uses <see cref="IGeneratedProblemAnalyzer"/>.
     /// <para>
-    /// The runner provides lots of useful debugging output configurable via <see cref="ProblemGenerationRunnerSettings"/>. It can write
-    /// output with or without proofs into human-readable or JSON format (that can be processed via Drawer). Human-readable files
-    /// contain information about simplification and ranking results.
+    /// The runner provides lots of useful debugging output configurable via <see cref="ProblemGenerationRunnerSettings"/>. 
+    /// It can write output with or without proofs into human-readable or JSON format (that can be processed via Drawer).
+    /// Human-readable files contain information about asymmetric exclusion and ranking results.
     /// </para>
     /// <para>
-    /// It uses <see cref="ITheoremSorter"/> to find globally best theorems across multiple runs and provides an option to write
-    /// this information into a human-readable or JSON file.
+    /// It uses <see cref="ITheoremSorterTypeResolver"/> to find globally best theorems across multiple runs for each type. These
+    /// theorems are optionally written to human-readable files or JSON files.
     /// </para>
     /// <para>It also provides <see cref="IInferenceRuleUsageTracker"/> in case we need to analyze how the theorem prover works.</para>
     /// </summary>
     public class ProblemGenerationRunner : IProblemGenerationRunner
     {
         #region Dependencies
+
+        /// <summary>
+        /// The settings for this runner.
+        /// </summary>
+        private readonly ProblemGenerationRunnerSettings _settings;
 
         /// <summary>
         /// The generator of problems.
@@ -43,9 +50,9 @@ namespace GeoGen.MainLauncher
         private readonly IGeneratedProblemAnalyzer _analyzer;
 
         /// <summary>
-        /// The sorter used to find globally best theorems.
+        /// The resolver of sorters for each theorem type that are used to find globally best theorems.
         /// </summary>
-        private readonly ITheoremSorter _sorter;
+        private readonly ITheoremSorterTypeResolver _resolver;
 
         /// <summary>
         /// The factory for creating lazy writers of a JSON output.
@@ -59,37 +66,28 @@ namespace GeoGen.MainLauncher
 
         #endregion
 
-        #region Private fields
-
-        /// <summary>
-        /// The settings for this runner.
-        /// </summary>
-        private readonly ProblemGenerationRunnerSettings _settings;
-
-        #endregion
-
         #region Constructor
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ProblemGenerationRunner"/> class.
         /// </summary>
-        /// <param name="settings">The settings for this runner.</param>
-        /// <param name="generator">The generator of problems.</param>
-        /// <param name="analyzer">The analyzer of problem generator outputs.</param>
-        /// <param name="sorter">The sorter used to find globally best theorems.</param>
-        /// <param name="factory">The factory for creating lazy writers of a JSON output.</param>
-        /// <param name="tracker">The tracker of the used inference rules in theorem proofs.</param>
+        /// <param name="settings"><inheritdoc cref="_settings" path="/summary"/></param>
+        /// <param name="generator"><inheritdoc cref="_generator" path="/summary"/></param>
+        /// <param name="analyzer"><inheritdoc cref="_analyzer" path="/summary"/>.</param>
+        /// <param name="resolver"><inheritdoc cref="_resolver" path="/summary"/></param>
+        /// <param name="factory"><inheritdoc cref="_factory" path="/summary"/></param>
+        /// <param name="tracker"><inheritdoc cref="_tracker" path="/summary"/></param>
         public ProblemGenerationRunner(ProblemGenerationRunnerSettings settings,
                                        IProblemGenerator generator,
                                        IGeneratedProblemAnalyzer analyzer,
-                                       ITheoremSorter sorter,
+                                       ITheoremSorterTypeResolver resolver,
                                        IRankedTheoremJsonLazyWriterFactory factory,
                                        IInferenceRuleUsageTracker tracker)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _generator = generator ?? throw new ArgumentNullException(nameof(generator));
             _analyzer = analyzer ?? throw new ArgumentNullException(nameof(analyzer));
-            _sorter = sorter ?? throw new ArgumentNullException(nameof(sorter));
+            _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
             _factory = factory ?? throw new ArgumentNullException(nameof(factory));
             _tracker = tracker ?? throw new ArgumentNullException(nameof(tracker));
         }
@@ -180,13 +178,16 @@ namespace GeoGen.MainLauncher
 
             #endregion
 
-            #region Write iterations and maximal object counts
+            #region Write other setup
 
             // Write iterations
             WriteLineToBothReadableWriters($"\nIterations: {input.NumberOfIterations}");
 
             // Write maximal numbers of objects of particular types
             WriteLineToBothReadableWriters($"{input.MaximalNumbersOfObjectsToAdd.Select(pair => $"MaximalNumberOf{pair.Key}s: {pair.Value}").ToJoinedString("\n")}\n");
+
+            // Write whether we're excluding symmetry
+            WriteLineToBothReadableWriters($"GenerateOnlySymmetricConfigurations: {input.ExcludeAsymmetricConfigurations}");
 
             #endregion
 
@@ -222,6 +223,10 @@ namespace GeoGen.MainLauncher
             // Begin writing of the JSON output file
             jsonOutputWriter?.BeginWriting();
 
+            // Prepare the variable indicating whether we're writing best theorems,
+            // which happens when we want to write them either readable or JSON form
+            var writeBestTheorems = _settings.WriteReadableBestTheorems || _settings.WriteJsonBestTheorems;
+
             #region Generation loop
 
             // Run the generation
@@ -242,8 +247,12 @@ namespace GeoGen.MainLauncher
                         $"{_settings.ProgressLoggingFrequency} in " +
                         // Average time
                         $"{(double)stopwatch.ElapsedMilliseconds / numberOfGeneratedConfigurations * _settings.ProgressLoggingFrequency:F2} ms on average, " +
-                        // How many interesting configurations and theorems
-                        $"with {numberOfConfigurationsWithInterestingTheorem} interesting configurations ({numberOfInterestingTheorems} theorems in total).");
+                        // How many interesting theorems
+                        $"with {numberOfInterestingTheorems} theorems" +
+                        // How many interesting theorems after merge
+                        $"{(writeBestTheorems ? $" ({_resolver.AllSorters.Select(pair => pair.sorter.BestTheorems.Count()).Sum()} after global merge)" : "")}" +
+                        // How many configurations
+                        $" in {numberOfConfigurationsWithInterestingTheorem} configurations.");
 
                 #endregion
 
@@ -251,30 +260,30 @@ namespace GeoGen.MainLauncher
                 if (generatorOutput.NewTheorems.AllObjects.Count == 0)
                     continue;
 
-                // If this is not a configuration from the last iterations and we should skip those, do it
-                if (_settings.AnalyzeOnlyLastIteration && generatorOutput.Configuration.IterationIndex != input.NumberOfIterations)
-                    continue;
-
                 // Prepare the output of the analyzer
-                GeneratedProblemAnalyzerOutputBase analyzerOutput = null;
+                GeneratedProblemAnalyzerOutputBase analyzerOutput;
 
                 #region Analyzer call
 
                 try
                 {
+                    // The analyzer needs to know whether it should deem asymmetric problems as interesting.
+                    // This value is pulled from the input setup
+                    var areAsymetricProblemsInteresting = !input.ExcludeAsymmetricConfigurations;
+
                     // If we should look for proofs (because we should be writing them or analyze the inner inferences)
                     analyzerOutput = _settings.WriteInferenceRuleUsages || _settings.WriteReadableOutputWithProofs
                         // Then call the analysis that construct them
-                        ? (GeneratedProblemAnalyzerOutputBase)_analyzer.AnalyzeWithProofConstruction(generatorOutput)
+                        ? (GeneratedProblemAnalyzerOutputBase)_analyzer.AnalyzeWithProofConstruction(generatorOutput, areAsymetricProblemsInteresting)
                         // Otherwise we don't need them
-                        : _analyzer.AnalyzeWithoutProofConstruction(generatorOutput);
+                        : _analyzer.AnalyzeWithoutProofConstruction(generatorOutput, areAsymetricProblemsInteresting);
                 }
                 catch (Exception e)
                 {
                     // If there is any sort of problem, we should make aware of it. 
                     LoggingManager.LogError($"There has been an exception while analyzing the configuration:\n\n" +
                         // Write the problematic configuration
-                        $"{new OutputFormatter(generatorOutput.Configuration.AllObjects)}\n" +
+                        $"{new OutputFormatter(generatorOutput.Configuration.AllObjects).FormatConfiguration(generatorOutput.Configuration)}\n" +
                         // And also the exception
                         $"Exception: {e}");
 
@@ -294,32 +303,49 @@ namespace GeoGen.MainLauncher
                 // Write JSON output
                 jsonOutputWriter?.Write(analyzerOutput.InterestingTheorems);
 
-                #region Finding ranked theorems to be judged
+                #region Handling best theorems
 
-                // If we should take just one theorem per configuration
-                var theoremsToBeJudged = _settings.TakeAtMostOneInterestingTheoremPerConfiguration
-                    // Then take the first (which has the best ranking)
-                    ? analyzerOutput.InterestingTheorems.FirstOrDefault()?.ToEnumerable() ?? Enumerable.Empty<RankedTheorem>()
-                    // Otherwise all of them
-                    : analyzerOutput.InterestingTheorems;
-
-                try
+                // If we are supposed to be handling best theorems, do so
+                if (writeBestTheorems)
                 {
-                    // Let the sorter judge the theorems to be marked
-                    _sorter.AddTheorems(theoremsToBeJudged, out var bestTheoremsChanged);
+                    // Take the interesting theorems
+                    var theoremsToBeJudged = analyzerOutput.InterestingTheorems
+                        // Group by type
+                        .GroupBy(rankedTheorem => rankedTheorem.Theorem.Type);
 
-                    // If we should write best theorems continuously and there are some changes, do it
-                    if (_settings.WriteBestTheoremsContinuously && bestTheoremsChanged)
-                        RewriteBestTheorems();
-                }
-                catch (Exception e)
-                {
-                    // If there is any sort of problem, we should make aware of it. 
-                    LoggingManager.LogError($"There has been an exception while sorting theorems of the configuration:\n\n" +
-                        // Write the problematic configuration
-                        $"{new OutputFormatter(generatorOutput.Configuration.AllObjects)}\n" +
-                        // And also the exception
-                        $"Exception: {e}");
+                    try
+                    {
+                        // Prepare the set of sorters whose content changed
+                        var updatedSorterTypes = new HashSet<TheoremType>();
+
+                        // Mark all interesting theorems
+                        analyzerOutput.InterestingTheorems
+                            // Grouped by type
+                            .GroupBy(rankedTheorem => rankedTheorem.Theorem.Type)
+                            // Handle each group
+                            .ForEach(group =>
+                            {
+                                // Let the sorter judge the theorems
+                                _resolver.GetSorterForType(group.Key).AddTheorems(group, out var localBestTheoremChanged);
+
+                                // If there is any local change, mark it
+                                if (localBestTheoremChanged)
+                                    updatedSorterTypes.Add(group.Key);
+                            });
+
+                        // If we should write best theorems continuously, do it
+                        if (_settings.WriteBestTheoremsContinuously)
+                            RewriteBestTheorems(updatedSorterTypes);
+                    }
+                    catch (Exception e)
+                    {
+                        // If there is any sort of problem, we should make aware of it. 
+                        LoggingManager.LogError($"There has been an exception while sorting theorems of the configuration:\n\n" +
+                            // Write the problematic configuration
+                            $"{new OutputFormatter(generatorOutput.Configuration.AllObjects).FormatConfiguration(generatorOutput.Configuration)}\n" +
+                            // And also the exception
+                            $"Exception: {e}");
+                    }
                 }
 
                 #endregion
@@ -397,17 +423,22 @@ namespace GeoGen.MainLauncher
 
             #endregion
 
+            // Prepare the string explaining the state after merge
+            var afterMergeString = $"{(writeBestTheorems ? $"{_resolver.AllSorters.Select(pair => pair.sorter.BestTheorems.Count()).Sum()}" : "-")}";
+
             // Write end
             WriteLineToBothReadableWriters("\n------------------------------------------------");
             WriteLineToBothReadableWriters($"Generated configurations: {numberOfGeneratedConfigurations}");
             WriteLineToBothReadableWriters($"Configurations with an interesting theorem: {numberOfConfigurationsWithInterestingTheorem}");
             WriteLineToBothReadableWriters($"Interesting theorems: {numberOfInterestingTheorems}");
+            WriteLineToBothReadableWriters($"Interesting theorems after global merge: {afterMergeString}");
             WriteLineToBothReadableWriters($"Run-time: {stopwatch.ElapsedMilliseconds} ms");
 
             // Log these stats as well
             LoggingManager.LogInfo($"Generated configurations: {numberOfGeneratedConfigurations}");
             LoggingManager.LogInfo($"Configurations with an interesting theorem: {numberOfConfigurationsWithInterestingTheorem}");
             LoggingManager.LogInfo($"Interesting theorems: {numberOfInterestingTheorems}");
+            LoggingManager.LogInfo($"Interesting theorems after global merge: {afterMergeString}");
             LoggingManager.LogInfo($"Run-time: {stopwatch.ElapsedMilliseconds} ms");
 
             // Close the JSON output writer
@@ -415,26 +446,43 @@ namespace GeoGen.MainLauncher
         }
 
         /// <summary>
-        /// Rewrites the best theorem files, i.e. the readable file or the JSON file, based on whether we are told to do
-        /// it via settings.
+        /// Rewrites the best theorem files, i.e. the readable files for each type or the JSON files based on settings.
         /// </summary>
-        private void RewriteBestTheorems()
+        /// <param name="typesToWrite">The theorem types to be rewritten. If the value is null (by default), then all sorters are rewritten.</param>
+        private void RewriteBestTheorems(IReadOnlyCollection<TheoremType> typesToWrite = null)
         {
-            // If we should write readable output...
-            if (_settings.WriteReadableBestTheoremFile)
-            {
-                // Prepare the writer
-                using var readableBestTheoremWriter = new StreamWriter(new FileStream(_settings.ReadableBestTheoremFilePath, FileMode.Create, FileAccess.Write, FileShare.Read));
+            // Prepare the sorters to be rewritten by analyzing the passed types
+            var sorters = typesToWrite
+                // For each find the sorter
+                ?.Select(type => (type, sorter: _resolver.GetSorterForType(type)))
+                // Or if the types are null, take all sorters
+                ?? _resolver.AllSorters;
 
-                // Rewrite the file
-                readableBestTheoremWriter.Write(RankedTheoremsToString(_sorter.BestTheorems));
-            }
-
-            // If we should write JSON output
-            if (_settings.WriteJsonBestTheoremFile)
+            // For every type and sorter
+            foreach (var (type, sorter) in sorters)
             {
-                // Rewrite the JSON output
-                _factory.Create(_settings.JsonBestTheoremFilePath).WriteEagerly(_sorter.BestTheorems);
+                // If we should write readable output...
+                if (_settings.WriteReadableBestTheorems)
+                {
+                    // Prepare the path by combining the folder and the theorem type
+                    var theoremFilePath = $"{Path.Combine(_settings.ReadableBestTheoremFolder, type.ToString())}.{_settings.FileExtension}";
+
+                    // Prepare the writer
+                    using var readableBestTheoremWriter = new StreamWriter(new FileStream(theoremFilePath, FileMode.Create, FileAccess.Write, FileShare.Read));
+
+                    // Rewrite the file
+                    readableBestTheoremWriter.Write(RankedTheoremsToString(sorter.BestTheorems));
+                }
+
+                // If we should write JSON output
+                if (_settings.WriteJsonBestTheorems)
+                {
+                    // Prepare the path by combining the folder and the theorem type
+                    var theoremFilePath = $"{Path.Combine(_settings.JsonBestTheoremFolder, type.ToString())}.json";
+
+                    // Rewrite the JSON output
+                    _factory.Create(theoremFilePath).WriteEagerly(sorter.BestTheorems);
+                }
             }
         }
 
@@ -479,7 +527,7 @@ namespace GeoGen.MainLauncher
 
                 // Add the theorem
                 result += $"\n\n{formatter.FormatTheorem(rankedTheorem.Theorem)}" +
-                    // With the ranking
+                    // Add the total ranking
                     $" - total ranking {rankedTheorem.Ranking.TotalRanking.ToStringWithDecimalDot()}\n\n";
 
                 // Add the ranking
@@ -533,44 +581,24 @@ namespace GeoGen.MainLauncher
 
             #endregion
 
-            #region Simplified theorems
+            #region Asymmetric theorems
 
-            // If there are any simplified theorems
-            if (analyzerOutput.SimplifiedTheorems.Any())
+            // If there are any asymmetric theorems
+            if (analyzerOutput.NotInterestringAsymmetricTheorems.Any())
             {
                 // Append the header
-                result = $"{result.TrimEnd()}\n\nSimplified theorems:\n\n";
+                result = $"{result.TrimEnd()}\n\nAsymmetric theorems:\n\n";
 
-                // Append the simplified theorems by taking them
-                result += analyzerOutput.SimplifiedTheorems
-                    // Sort by their statement
-                    .OrderBy(pair => formatter.FormatTheorem(pair.Key))
-                    // Handle each pair
-                    .Select(pair =>
-                    {
-                        // Deconstruct
-                        var (oldTheorem, simplificationPair) = pair;
-
-                        // Deconstruct
-                        var (newTheorem, newConfiguration) = simplificationPair;
-
-                        // Prepare the local result with the local index (while increasing it)
-                        var result = $" {localTheoremIndex++}. {formatter.FormatTheorem(oldTheorem)} - can be simplified:\n\n";
-
-                        // Prepare the formatter for the new configuration
-                        var newFormatter = new OutputFormatter(newConfiguration.AllObjects);
-
-                        // Add the new configuration
-                        result += $"{newFormatter.FormatConfiguration(newConfiguration).Indent(3)}\n\n";
-
-                        // Add the new theorem
-                        result += $"{newFormatter.FormatTheorem(newTheorem).Indent(3)}";
-
-                        // Return it
-                        return result;
-                    })
+                // Append the asymmetric theorems by taking them
+                result += analyzerOutput.NotInterestringAsymmetricTheorems
+                    // Format them
+                    .Select(formatter.FormatTheorem)
+                    // Order by the statement
+                    .Ordered()
+                    // Prepend the local index and increase it
+                    .Select(theoremString => $" {localTheoremIndex++}. {theoremString}")
                     // Make each on a separate line
-                    .ToJoinedString("\n\n");
+                    .ToJoinedString("\n");
             }
 
             #endregion
@@ -620,7 +648,7 @@ namespace GeoGen.MainLauncher
             // Take the individual rankings ordered by the total contribution (ASC) and then the aspect name
             => ranking.Rankings.OrderBy(pair => (-pair.Value.Contribution, pair.Key.ToString()))
                 // Add each on an individual line with info about the weight
-                .Select(pair => $"  {pair.Key,-25}weight = {pair.Value.Weight.ToStringWithDecimalDot(),-10}" +
+                .Select(pair => $"  {pair.Key,-32}weight = {pair.Value.Weight.ToStringWithDecimalDot(),-10}" +
                     // The ranking
                     $"ranking = {pair.Value.Ranking.ToStringWithDecimalDot(),-10}" +
                     // And the total contribution

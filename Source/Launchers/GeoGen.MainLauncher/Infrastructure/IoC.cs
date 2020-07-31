@@ -3,13 +3,15 @@ using GeoGen.Constructor;
 using GeoGen.Infrastructure;
 using GeoGen.ProblemAnalyzer;
 using GeoGen.ProblemGenerator;
+using GeoGen.ProblemGenerator.InputProvider;
 using GeoGen.TheoremFinder;
 using GeoGen.TheoremProver;
+using GeoGen.TheoremProver.InferenceRuleProvider;
+using GeoGen.TheoremProver.ObjectIntroductionRuleProvider;
 using GeoGen.TheoremRanker;
-using GeoGen.TheoremSimplifier;
+using GeoGen.TheoremRanker.RankedTheoremIO;
 using GeoGen.TheoremSorter;
 using Ninject;
-using Ninject.Extensions.Factory;
 using System.Threading.Tasks;
 
 namespace GeoGen.MainLauncher
@@ -42,17 +44,26 @@ namespace GeoGen.MainLauncher
             // Add the logging system
             Kernel.AddLogging(settings.LoggingSettings);
 
+            // Add ranked theorem writing and reading
+            Kernel.AddRankedTheoremIO();
+
             #region Local dependencies
 
             // Add local dependencies
             Kernel.Bind<IBatchRunner>().To<BatchRunner>();
             Kernel.Bind<IProblemGenerationRunner>().To<ProblemGenerationRunner>().WithConstructorArgument(settings.ProblemGenerationRunnerSettings);
-            Kernel.Bind<IProblemGeneratorInputProvider>().To<ProblemGeneratorInputProvider>().WithConstructorArgument(settings.ProblemGeneratorInputProviderSettings);
-            Kernel.Bind<IInferenceRuleProvider>().To<InferenceRuleProvider>().WithConstructorArgument(settings.InferenceRuleProviderSettings);
-            Kernel.Bind<ISimplificationRuleProvider>().To<SimplificationRuleProvider>().WithConstructorArgument(settings.SimplificationRuleProviderSettings);
-            Kernel.Bind<IObjectIntroductionRuleProvider>().To<ObjectIntroductionRuleProvider>().WithConstructorArgument(settings.ObjectIntroductionRuleProviderSettings);
-            Kernel.Bind<IRankedTheoremJsonLazyWriter>().To<RankedTheoremJsonLazyWriter>();
-            Kernel.Bind<IRankedTheoremJsonLazyWriterFactory>().ToFactory();
+            Kernel.Bind<ITheoremSorterTypeResolver>().To<TheoremSorterTypeResolver>().WithConstructorArgument(settings.TheoremSorterTypeResolverSettings);
+
+            #endregion
+
+            #region Providers
+
+            // Add inference rule provider
+            Kernel.AddInferenceRuleProvider(settings.InferenceRuleProviderSettings)
+                // Add object introduction rule provider
+                .AddObjectIntroductionRuleProvider(settings.ObjectIntroductionRuleProviderSettings)
+                // Add problem generator input provider
+                .AddProblemGeneratorInputProvider(settings.ProblemGeneratorInputProviderSettings);
 
             #endregion
 
@@ -71,7 +82,7 @@ namespace GeoGen.MainLauncher
                 // And the theorem finder
                 .AddTheoremFinder(settings.TheoremFindingSettings)
                 // And the theorem ranker
-                .AddTheoremRanker(settings.TheoremRankingSettings)
+                .AddTheoremRanker(settings.TheoremRankerSettings)
                 // And the theorem prover and with its settings
                 .AddTheoremProver(new TheoremProvingSettings
                 (
@@ -79,16 +90,17 @@ namespace GeoGen.MainLauncher
                     inferenceRuleManagerData: managerData,
 
                     // Load the object introduction data as well
-                    objectIntroducerData: new ObjectIntroducerData(await Kernel.Get<IObjectIntroductionRuleProvider>().GetObjectIntroductionRulesAsync())
+                    objectIntroducerData: new ObjectIntroducerData(await Kernel.Get<IObjectIntroductionRuleProvider>().GetObjectIntroductionRulesAsync()),
+
+                    // Set the prover's settings
+                    theoremProverSettings: settings.TheoremProverSettings
                 ))
-                // And the theorem simplifier with the loaded simplification rules
-                .AddTheoremSimplifier(new TheoremSimplifierData(await Kernel.Get<ISimplificationRuleProvider>().GetSimplificationRulesAsync()))
                 // And the problem generator and with its settings
                 .AddProblemGenerator(settings.ProblemGeneratorSettings)
-                // And the analyzer
-                .AddAnalyzer()
-                // And the sorter with its settings
-                .AddTheoremSorter(settings.TheoremSorterSettings);
+                // And the problem analyzer
+                .AddProblemAnalyzer()
+                // And the sorter
+                .AddTheoremSorter();
 
             #endregion
 
