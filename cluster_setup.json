@@ -1,5 +1,5 @@
 {
-  "optimization_procedure_name": "real4",
+  "optimization_procedure_name": "real5",
   "results_dir": "/home/mrolinek/GeoGenResults",
   "git_params": {
     "branch": "experiment",
@@ -17,14 +17,14 @@
     "bid": 50
   },
   "fixed_params": {
-    "input_dir": "/home/mrolinek/ExperimentsData"
+    "input_dir": "/home/mrolinek/ExperimentData"
   },
   "restarts": 1,
   "samples": null,
   "hyperparam_list": [
     {
       "param": "folder_number",
-      "values": "{list(range(1, 1355))}"
+      "values": "{list(range(1, 14))}"
     }
   ]
 }
