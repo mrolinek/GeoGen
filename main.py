@@ -8,7 +8,7 @@ with open('settings.json') as f:
     orig_settings = json.load(f)
 
 params = update_params_from_cmdline()
-os.makedirs(params.model_dir, exist_ok=True)
+os.makedirs(params.working_dir, exist_ok=True)
 
 input_path = os.path.join(params.input_dir, f'input_{params.folder_number}')
 orig_settings["ProblemGeneratorInputProviderSettings"]["InputFolderPath"] = input_path
